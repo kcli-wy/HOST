@@ -1,6 +1,8 @@
 # coding=utf-8
 """Configuration of an experiment."""
 
+from pathlib import Path
+
 from easydict import EasyDict as edict
 
 # Get the configuration dictionary whose keys can be accessed with dot.
@@ -49,6 +51,9 @@ CONFIG.MODEL = edict()
 
 CONFIG.MODEL.BASE_MODEL = edict()
 CONFIG.MODEL.BASE_MODEL.NETWORK = 'Qwen3-VL-Embedding-8B'
+CONFIG.MODEL.BASE_MODEL.MODEL_PATH = str(
+    Path(__file__).resolve().parent.parent / 'Qwen3-VL-Embedding-8B'
+)
 
 # Embedder params (LinearEmbedder, applied on top of the Qwen backbone).
 CONFIG.MODEL.CONV_EMBEDDER_MODEL = edict()

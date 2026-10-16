@@ -6,7 +6,7 @@ set -e # Exit on error
 # Example: CONVERT_HF=1 ./scripts/convert_ds_to_hf.sh logs/tcc_qwen_alignment_20260104_162651
 
 INPUT_ARG=${1:-"tcc_qwen_alignment_"}
-MODEL_PATH=${2:-"/mnt/data/checkpoint/ethanchen/Qwen3/Qwen3-VL-Embedding-8B"}
+MODEL_PATH=${2:-}
 
 if [ -z "$INPUT_ARG" ]; then
     echo "Usage: $0 <log_directory_or_pattern> [model_name_or_path]"
@@ -56,7 +56,7 @@ PROJECT_ROOT=$(dirname $(dirname $(realpath $0)))
 
 echo "========================================================"
 echo "Processing Log Directory: $LOG_DIR"
-echo "Base Model Path: $MODEL_PATH"
+echo "Base Model Path: ${MODEL_PATH:-CONFIG.MODEL.BASE_MODEL.MODEL_PATH (alignment/config.py)}"
 echo "========================================================"
 
 # 1. Prepare Output Directories
@@ -111,9 +111,13 @@ CONVERT_SCRIPT="$PROJECT_ROOT/scripts/convert_ckpt_to_hf.py"
 
 if [ "${CONVERT_HF:-0}" = "1" ]; then
     echo "[3/3] Converting to HuggingFace format..."
-    python $CONVERT_SCRIPT \
+    MODEL_ARGS=()
+    if [ -n "$MODEL_PATH" ]; then
+        MODEL_ARGS=(--model_name_or_path "$MODEL_PATH")
+    fi
+    python "$CONVERT_SCRIPT" \
         --checkpoint_path $OUTPUT_BIN \
-        --model_name_or_path $MODEL_PATH \
+        "${MODEL_ARGS[@]}" \
         --output_dir $HF_DIR
     echo "========================================================"
     echo "SUCCESS!"

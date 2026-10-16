@@ -45,6 +45,15 @@ conda activate HOST_Alignment
 the key dependencies are PyTorch, DeepSpeed, `transformers` (for Qwen3-VL), and the Qwen3-VL
 image/video processor stack.
 
+### Local model path
+
+Set `CONFIG.MODEL.BASE_MODEL.MODEL_PATH` in `config.py` to the local
+Qwen3-VL-Embedding-8B directory. It defaults to `Qwen3-VL-Embedding-8B/` at the
+repository root, resolved relative to `config.py` rather than the working directory.
+Model loading, training/evaluation processors, and checkpoint conversion all use
+this setting. Conversion scripts still accept an explicit model path through
+`--model_name_or_path` (Python) or the second positional argument (shell).
+
 ## Data Preparation
 
 `alignment/` and `policy_training/` consume the same on-disk data convention — see

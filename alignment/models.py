@@ -23,12 +23,7 @@ class BaseModel(nn.Module):
 
         if 'Qwen3-VL' in network:
             print(f"Loading {network}...")
-            # TODO(open-source): internal-cluster path, load-bearing for the
-            # verified training run — do not remove without re-verifying end-to-end.
-            # Planned fix: env var override defaulting to this path, falling back to
-            # the public HF repo https://huggingface.co/Qwen/Qwen3-VL-Embedding-8B
-            # if neither is present. See OPEN_SOURCE_PATH_TODOS.md.
-            model_path = '/mnt/data/checkpoint/ethanchen/Qwen3/Qwen3-VL-Embedding-8B'
+            model_path = CONFIG.MODEL.BASE_MODEL.MODEL_PATH
             if not os.path.exists(model_path):
                 raise FileNotFoundError(f"Model not found at {model_path}")
             
