@@ -232,6 +232,27 @@ Pass your JSON episode list through `VIDEO_PATHS`, then launch the DeepSpeed ZeR
 VIDEO_PATHS=/path/to/video_paths.json bash train_scripts/run_ds.sh
 ```
 
+For the prepared HumanGen pairs in `alignment/humangen_pairs/output/`, use the same entrypoint:
+
+```bash
+VIDEO_PATHS=humangen_pairs/output/HumanGen_video_paths.json bash train_scripts/run_ds.sh
+```
+
+The defaults in `alignment/config.py` use the generated HumanGen camera mapping and disable
+joint conditioning for these video-only pairs. If the index has not been generated, follow
+[`alignment/humangen_pairs/README.md`](./alignment/humangen_pairs/README.md) first. For another
+dataset, set `CONFIG.DATA.CAM_MAPPING_DIR` to its camera mapping directory; enable
+`CONFIG.JOINTS.USE_JOINTS` only when joint data and its normalization mapping are available.
+The launcher uses CPU optimizer offload and four persistent `spawn` data workers to prepare
+batches while the GPU computes. It requires substantial host RAM as well as GPU memory. Set `MAX_ITERS=2`
+before the launch command for a short training check; the default is 3,000 optimizer steps.
+
+For configuration file locations, their roles, effective defaults, and override precedence, see
+[the HumanGen configuration guide](./alignment/humangen_pairs/README.md#配置文件位置与作用).
+The original launcher reads `alignment/config.py` and `alignment/scripts/ds_config_zero3.json`;
+`alignment/humangen_pairs/config.json` configures data preparation and the optional HumanGen
+training wrapper, and is not read by `train_scripts/run_ds.sh`.
+
 For evaluation or a custom launcher, inspect all supported arguments with:
 
 ```bash

@@ -58,6 +58,8 @@ class BaseModel(nn.Module):
                 'attention_mask': inputs['attention_mask'],
                 'pixel_values': inputs['pixel_values'],
                 'image_grid_thw': inputs['image_grid_thw'],
+                # Alignment uses hidden states, so full vocabulary logits are unnecessary.
+                'logits_to_keep': 1,
                 'output_hidden_states': True,
                 'return_dict': True
             }
@@ -133,11 +135,8 @@ class BaseModel(nn.Module):
                         # but in AlignmentCollator, only chunk_imgs (groups) have <|file_sep|> after them.
                         # The initial video_imgs (align) does NOT have <|file_sep|> after it in content.
 
-                        for g in range(min(len(cls_indices), n_m + n_r)):
-                            idx = cls_indices[g]
-                            emb = hs_b[idx]
-
-                            sample_embs.append(emb)
+                        # Gather on device; scalar CUDA indices force a host sync per group.
+                        sample_embs.extend(hs_b.index_select(0, cls_indices[:n_m + n_r]).unbind(0))
 
                     if len(sample_embs) < (n_m + n_r):
                         print(f"Warning: Incomplete CLS tokens found for batch {b}. Expected {n_m + n_r}, found {len(sample_embs)}.")

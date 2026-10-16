@@ -21,6 +21,7 @@ CONFIG.IMAGE_SIZE = 224
 # ******************************************************************************
 
 CONFIG.TRAIN = edict()
+CONFIG.TRAIN.CPU_NUM_THREADS = 22
 CONFIG.TRAIN.NUM_FRAMES = 24
 CONFIG.TRAIN.NUM_ALIGN_FRAMES = 24
 CONFIG.TRAIN.MAX_BATCH_FRAMES = 96
@@ -100,9 +101,13 @@ CONFIG.DATA.RANDOM_OFFSET = 1
 CONFIG.DATA.NUM_STEPS = 3  # number of frames that will be embedded jointly,
 # Camera order for JSON training: {CAM_MAPPING_DIR}/{dataset_name}_cam_mapping.json (task_path -> [view names]).
 # For 3-camera setups, set NUM_STEPS to 6 so NUM_STEPS // num_views stays integral.
-CONFIG.DATA.CAM_MAPPING_DIR = '/open_data/cgy/cam_mapping'
+CONFIG.DATA.CAM_MAPPING_DIR = str(
+    Path(__file__).resolve().parent / 'humangen_pairs/output/cam_mapping'
+)
 CONFIG.DATA.USE_CAM_MAPPING = True
 CONFIG.DATA.FRAME_STRIDE = 10
+CONFIG.DATA.NUM_WORKERS = 4
+CONFIG.DATA.PREFETCH_FACTOR = 1
 
 # Dataset weights for sampling. Key: dataset name (from json filename), Value: weight.
 CONFIG.DATA.DATASET_WEIGHTS = {
@@ -161,12 +166,13 @@ CONFIG.CHECKPOINT.SAVE_INTERVAL = 500
 # DeepSpeed params
 # ******************************************************************************
 CONFIG.DS_CONFIG = edict()
-CONFIG.DS_CONFIG.train_micro_batch_size_per_gpu = 4
+CONFIG.DS_CONFIG.train_micro_batch_size_per_gpu = 5
 CONFIG.DS_CONFIG.gradient_clipping = 3.0
 
 CONFIG.DS_CONFIG.optimizer = edict()
 CONFIG.DS_CONFIG.optimizer.type = 'AdamW'
 CONFIG.DS_CONFIG.optimizer.params = edict()
+CONFIG.DS_CONFIG.optimizer.params.torch_adam = True
 CONFIG.DS_CONFIG.optimizer.params.lr = 0.00001
 CONFIG.DS_CONFIG.optimizer.params.betas = [0.9, 0.999]
 CONFIG.DS_CONFIG.optimizer.params.eps = 1e-8
@@ -184,7 +190,7 @@ CONFIG.DS_CONFIG.scheduler.params.cos_min_ratio = 0.3
 # Joint state tokenization params
 # ******************************************************************************
 CONFIG.JOINTS = edict()
-CONFIG.JOINTS.USE_JOINTS = True
+CONFIG.JOINTS.USE_JOINTS = False
 CONFIG.JOINTS.NUM_BINS = 192
 CONFIG.JOINTS.JOINT_ACTION_MAPPING_DIR = '/open_data/cgy/joint_action_mapping'
 

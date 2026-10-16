@@ -7,6 +7,7 @@ import json
 import glob
 import random
 import zlib
+from functools import partial
 import torch
 from torch.utils.data import Dataset, DataLoader, Sampler
 from torchvision import transforms
@@ -182,11 +183,13 @@ class AlignmentCollator:
         for video_path, frame_list in video_frame_groups.items():
             try:
                 vr = decord.VideoReader(video_path, num_threads=1)
-                indices = [frame_idx for _, frame_idx, _, _ in frame_list]
+                frame_sizes = {frame_idx: (width, height)
+                               for _, frame_idx, width, height in frame_list}
+                indices = sorted(frame_sizes)
                 frames_np = vr.get_batch(indices).asnumpy()
 
-                for i, (path_idx, frame_idx, target_w, target_h) in enumerate(frame_list):
-                    frame = frames_np[i]  # (H, W, C)
+                for frame_idx, frame in zip(indices, frames_np):
+                    target_w, target_h = frame_sizes[frame_idx]
                     img = Image.fromarray(frame.astype(np.uint8)).convert('RGB')
 
                     if target_w is not None and target_h is not None:
@@ -502,8 +505,9 @@ class AlignmentCollator:
                 prepared.append(None)
                 continue
 
-            main_all = self.load_imgs(align + main_paths)
-            ref_all  = self.load_imgs(align + ref_paths) if ref_paths else []
+            images = self.load_imgs(align + main_paths + ref_paths)
+            main_all = images[:len(align) + len(main_paths)]
+            ref_all = images[:len(align)] + images[len(main_all):] if ref_paths else []
 
             if do_augment:
                 jitter = self.color_jitter if self.do_color_jitter else None
@@ -771,18 +775,19 @@ class AlignmentCollator:
                 prepared=prepared)
             qwen_paired = self._assemble_qwen_dict(student_sink)
 
-            # Main-only: reuse prepared (no extra image load)
-            sink_main_only = self._build_qwen_input(
-                batch, context_size,
-                frame_paths_key='frame_paths',
-                ref_frame_paths_key=None,
-                do_augment=True,
-                update_metadata=True,
-                align_paths_key='_cached_align_paths',
-                prepared=prepared)
             collated_batch['qwen_input']           = qwen_paired
             collated_batch['qwen_input_paired']    = qwen_paired
-            collated_batch['qwen_input_main_only'] = self._assemble_qwen_dict(sink_main_only)
+            if self.mode != 'train':
+                # Main-only input is used only by the evaluation reference cache.
+                sink_main_only = self._build_qwen_input(
+                    batch, context_size,
+                    frame_paths_key='frame_paths',
+                    ref_frame_paths_key=None,
+                    do_augment=True,
+                    update_metadata=True,
+                    align_paths_key='_cached_align_paths',
+                    prepared=prepared)
+                collated_batch['qwen_input_main_only'] = self._assemble_qwen_dict(sink_main_only)
 
         # Row-level logging metadata (aligned with student Qwen rows)
         collated_batch['aug_params']      = student_sink['aug_params']
@@ -1653,7 +1658,7 @@ class AlignmentDataset(Dataset):
 
         main_files = self._get_files(video_info, view=view)
         ref_files = self._get_files(ref_video_info, view=ref_view)
-        align_files = self._get_files(align_video_info, view=align_view)
+        align_files = ref_files
 
         if not main_files:
             return None  # Signal failure
@@ -1938,8 +1943,11 @@ class InfiniteDataLoader:
             data = next(self.iterator)
         return data
 
-def worker_init_fn(worker_id):
+def worker_init_fn(worker_id, config=None):
     """Worker initialization function to ensure different seeds for each worker."""
+    if config is not None:
+        CONFIG.clear()
+        CONFIG.update(config)
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
     random.seed(worker_seed)
@@ -2030,7 +2038,15 @@ def create_dataset(split, mode, batch_size=None, return_iterator=True, distribut
     
     collator = AlignmentCollator(processor=processor, mode=mode)
 
-    num_workers = 12 if mode == 'train' else 12
+    num_workers = CONFIG.DATA.NUM_WORKERS if mode == 'train' else 12
+    worker_options = {}
+    if mode == 'train' and num_workers > 0:
+        # Spawn avoids copying the model/CPU optimizer states into data workers.
+        worker_options = dict(
+            multiprocessing_context='spawn',
+            prefetch_factor=CONFIG.DATA.PREFETCH_FACTOR,
+            persistent_workers=True,
+        )
 
     dataloader = DataLoader(
         dataset,
@@ -2041,7 +2057,8 @@ def create_dataset(split, mode, batch_size=None, return_iterator=True, distribut
         pin_memory=True,
         drop_last=(mode == 'train'),
         collate_fn=collator,
-        worker_init_fn=worker_init_fn
+        worker_init_fn=partial(worker_init_fn, config=CONFIG) if mode == 'train' else worker_init_fn,
+        **worker_options
     )
     
     if return_iterator and mode == 'train':

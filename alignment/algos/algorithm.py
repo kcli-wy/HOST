@@ -131,15 +131,16 @@ class Algorithm(nn.Module):
             # Restore paired metadata for subsequent merge logic
             data['qwen_input'] = data.get('qwen_input_paired', data['qwen_input'])
         else:
-            print("caching ref embeddings")
-            # Cache miss: Qwen ran on paired; split and populate cache
+            # Paired forward: split both streams and cache only during evaluation.
             B = embs.size(0) // 2
             embs_main = embs[:B]
             embs_ref  = embs[B:]
-            n = len(data['ref_frame_paths']) // 2
-            ref_paths = data['ref_frame_paths'][n:]
-            for i, rp in enumerate(ref_paths):
-                self._ref_cache.put(rp, embs_ref[i])
+            if not training:
+                print("caching ref embeddings")
+                n = len(data['ref_frame_paths']) // 2
+                ref_paths = data['ref_frame_paths'][n:]
+                for i, rp in enumerate(ref_paths):
+                    self._ref_cache.put(rp, embs_ref[i])
 
         # --- Merge Chunks ---
         # qwen_meta must come from paired data so that group_ids/chunk_ids describe both halves

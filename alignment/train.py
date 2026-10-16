@@ -42,6 +42,7 @@ FLAGS = flags.FLAGS
 
 def train(argv):
   """Trains model and evaluates on relevant downstream tasks."""
+  torch.set_num_threads(CONFIG.TRAIN.CPU_NUM_THREADS)
   if FLAGS.save_interval is not None:
       CONFIG.CHECKPOINT.SAVE_INTERVAL = FLAGS.save_interval
   
@@ -276,8 +277,9 @@ def train(argv):
 
       model_engine.backward(loss)
 
+      is_accumulation_boundary = model_engine.is_gradient_accumulation_boundary()
       model_engine.step()
-      if model_engine.is_gradient_accumulation_boundary():
+      if is_accumulation_boundary:
           current_step += 1
           if is_master:
               pbar.update(1)
@@ -290,7 +292,7 @@ def train(argv):
           postfix = {'loss': loss.item(), 'lr': model_engine.get_lr()[0]}
           pbar.set_postfix(postfix)
       
-      if is_master and current_step % CONFIG.LOGGING.REPORT_INTERVAL == 0:
+      if is_master and is_accumulation_boundary and current_step % CONFIG.LOGGING.REPORT_INTERVAL == 0:
           log_dict = {'loss': loss.item(), 'lr': model_engine.get_lr()[0]}
 
           if loss_dict:
@@ -312,7 +314,7 @@ def train(argv):
               log_dict['grad_norm'] = grad_norm
           wandb.log(log_dict, step=current_step)
           
-      if current_step % CONFIG.CHECKPOINT.SAVE_INTERVAL == 0 and current_step > 0:
+      if is_accumulation_boundary and current_step % CONFIG.CHECKPOINT.SAVE_INTERVAL == 0 and current_step > 0:
           client_state = {'step': current_step}
           model_engine.save_checkpoint(logdir, current_step, client_state=client_state)
 
@@ -333,6 +335,7 @@ def train(argv):
                   logging.error(f"Failed to save Qwen model in HF format: {e}")
 
   if is_master:
+      logging.info('Completed %d optimizer steps.', model_engine.global_steps)
       pbar.close()
 
 

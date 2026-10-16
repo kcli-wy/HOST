@@ -77,7 +77,7 @@ CONFIG.DATA.NUM_STEPS = 3            # frames per chunk
 CONFIG.DATA.FRAME_STRIDE = 10        # stride between context frames
 CONFIG.TRAIN.NUM_FRAMES = 24         # anchor frames sampled per video
 CONFIG.TRAIN.NUM_ALIGN_FRAMES = 24   # reference frames used for the alignment window
-CONFIG.DATA.CAM_MAPPING_DIR = ''     # set to your cam_mapping directory if multi-view
+CONFIG.DATA.CAM_MAPPING_DIR = ...    # defaults to humangen_pairs/output/cam_mapping
 CONFIG.DATA.SEGMENTED_PATH_DATASETS = ('AgiBotWorld', '10042')  # dataset ids using the segmented path:id:start-end format
 CONFIG.JOINTS.USE_JOINTS = False     # set True + JOINT_ACTION_MAPPING_DIR to condition on joint state
 ```
@@ -92,6 +92,60 @@ This wraps `train.py` with `torchrun` + DeepSpeed ZeRO-3. Key flags (see `train.
 full list): `--video_paths` (required), `--network` (`Qwen3-VL-Embedding-8B` is the verified path),
 `--gradient_accumulation_steps`, `--ds_config`, `--save_interval`, `--max_iters`, `--resume_dir`,
 `--pretrain_weights`. `WANDB_API_KEY` falls back to offline logging if unset.
+
+For the prepared HumanGen pairs, the default camera mapping and video-only settings in
+`config.py` allow the same launcher to be used directly:
+
+```bash
+VIDEO_PATHS=humangen_pairs/output/HumanGen_video_paths.json bash train_scripts/run_ds.sh
+```
+
+See [`humangen_pairs/README.md`](./humangen_pairs/README.md) for data preparation and validation.
+For other datasets, update `CONFIG.DATA.CAM_MAPPING_DIR` and, if joint conditioning is needed,
+`CONFIG.JOINTS.USE_JOINTS` and `CONFIG.JOINTS.JOINT_ACTION_MAPPING_DIR`.
+The ZeRO-3 configuration offloads optimizer states to CPU, and training uses four persistent
+`spawn` data workers with one prefetched batch per worker. Spawning workers avoids inheriting
+the large CPU optimizer state through `fork`. Single-GPU full-model training still requires
+substantial host RAM. It uses PyTorch AdamW to avoid compiling DeepSpeed optimizer extensions.
+`MAX_ITERS` and `SAVE_INTERVAL` can override the launcher's defaults
+(3,000 and 500 optimizer steps); use `MAX_ITERS=2` for a short training check.
+
+### Configuration files
+
+The original launcher uses [`config.py`](./config.py) for model/data/loss hyperparameters and
+[`scripts/ds_config_zero3.json`](./scripts/ds_config_zero3.json) for DeepSpeed precision, ZeRO
+and offload settings. [`train_scripts/run_ds.sh`](./train_scripts/run_ds.sh) supplies launch
+arguments and environment-variable overrides. It does not read
+[`humangen_pairs/config.json`](./humangen_pairs/config.json), which controls data preparation
+and the optional HumanGen wrapper. See the
+[configuration reference](./humangen_pairs/README.md#配置文件位置与作用) for all file locations,
+effective defaults, generated data mappings, path resolution and override precedence.
+
+### Input pipeline performance
+
+`CONFIG.DATA.NUM_WORKERS=4` and `CONFIG.DATA.PREFETCH_FACTOR=1` in `config.py` control training
+data preparation. Workers use `spawn`, receive the active configuration, and remain alive across
+epochs. Set `CONFIG.DATA.NUM_WORKERS=0` for synchronous debugging. Increasing the worker count also increases
+host memory use and concurrent storage access; measure throughput before increasing it further.
+The first batch includes worker startup and is not representative of steady-state data wait.
+
+The collator decodes each requested video frame once in sorted order, reuses raw alignment
+frames across the paired rows, and builds only the paired Qwen input during training. Each row
+still receives its original independent augmentation. Evaluation continues to build the main-only
+input used by reference caching. CPU optimizer offload still introduces pauses at update boundaries.
+See [the HumanGen performance notes](./humangen_pairs/README.md#训练读取性能) for validation results.
+
+`CONFIG.TRAIN.CPU_NUM_THREADS=22` limits each training process's PyTorch CPU thread count.
+This matches the current single-GPU container's CPU quota more closely than the original
+96-thread default; adjust it to the CPU resources available per rank on other machines or
+multi-GPU runs. Data worker thread counts are independent. Embedding forwards also use
+`logits_to_keep=1` to avoid projecting every token into the vocabulary while preserving all
+hidden features. Reference features are cached only during evaluation.
+Training no longer populates that cache with tensors that retain computation graphs.
+Packed CLS features are gathered with `index_select` to avoid reading each GPU index as a
+Python scalar. CPU optimizer offload still causes periodic utilization drops; see
+[the utilization notes](./humangen_pairs/README.md#为什么-gpu-利用率仍会高低交替) for the
+measured update cost, remaining bottleneck and next optimization prerequisites.
 
 ## Evaluation
 

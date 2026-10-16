@@ -10,8 +10,13 @@
     "bf16": {
         "enabled": true
     },
+    "zero_force_ds_cpu_optimizer": false,
     "zero_optimization": {
         "stage": 3,
+        "offload_optimizer": {
+            "device": "cpu",
+            "pin_memory": true
+        },
         "allgather_partitions": true,
         "allgather_bucket_size": 2e8,
         "overlap_comm": true,
