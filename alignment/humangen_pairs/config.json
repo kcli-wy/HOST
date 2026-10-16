@@ -1,0 +1,14 @@
+{
+  "source_root": "/AOSS/HumanGen",
+  "output_root": "output",
+  "datasets": ["agibot", "interna1", "oxe", "robocoin", "robomind", "robotwin"],
+  "workers": 64,
+  "training": {
+    "num_frames": 24,
+    "num_align_frames": 24,
+    "batch_size": 1,
+    "gradient_accumulation_steps": 4,
+    "max_iters": 3000,
+    "save_interval": 500
+  }
+}
