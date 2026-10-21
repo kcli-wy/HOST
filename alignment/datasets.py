@@ -49,6 +49,10 @@ class IgnoreSample(Exception):
     """Skip this index without logging (e.g. missing cam_mapping entry, empty cam_list). Caught in __getitem__."""
 
 
+class ViewConfigurationError(ValueError):
+    """Frame budgets must accommodate every native view without resampling the dataset."""
+
+
 # From 3Hz to 5Hz control frequency
 # 低频控制数据集 (通常 <= 5Hz)
 datasets_with_lower_frequency = [
@@ -1442,7 +1446,9 @@ class AlignmentDataset(Dataset):
     def _resolve_cam_list_main(self, video_info, dataset_name: str, mapping: dict) -> list:
         """Resolve ordered camera list from cam_mapping; every listed view must exist on main disk."""
         task_path = self._task_path_from_episode(video_info)
-        key = self._match_cam_mapping_task_key(mapping, task_path)
+        key = self._match_cam_mapping_task_key(mapping, self._video_dir_from_info(video_info))
+        if key is None:
+            key = self._match_cam_mapping_task_key(mapping, task_path)
         if key is None:
             logging.warning(
                 f"[cam_mapping] No task key matches dirname(episode_dir)={task_path!r} for dataset {dataset_name!r} "
@@ -1485,22 +1491,23 @@ class AlignmentDataset(Dataset):
             raise IgnoreSample()
         return list(raw)
 
-    def _cam_list_for_main_ref_align(self, cam_list_main: list, video_info, ref_video_info, align_video_info) -> list:
-        """Require every view in cam_list_main to exist on ref and align disks (main already validated)."""
+    def _cam_list_for_main_ref_align(self, cam_list_main: list, video_info, ref_video_info, align_video_info, ref_cam_list=None) -> list:
+        """Validate the reference cameras, using the main cameras for legacy callers."""
+        ref_cam_list = cam_list_main if ref_cam_list is None else ref_cam_list
         ref_ep = self._video_dir_from_info(ref_video_info)
         al_ep = self._video_dir_from_info(align_video_info)
-        missing_ref = [v for v in cam_list_main if not self._view_exists_on_disk(ref_video_info, v)]
+        missing_ref = [v for v in ref_cam_list if not self._view_exists_on_disk(ref_video_info, v)]
         if missing_ref:
             logging.warning(
                 f"[cam_mapping] Incomplete cameras on ref disk {ref_ep!r}: missing views {missing_ref} "
-                f"(required all of {cam_list_main!r}); resampling sample."
+                f"(required all of {ref_cam_list!r}); resampling sample."
             )
             raise IgnoreSample()
-        missing_align = [v for v in cam_list_main if not self._view_exists_on_disk(align_video_info, v)]
+        missing_align = [v for v in ref_cam_list if not self._view_exists_on_disk(align_video_info, v)]
         if missing_align:
             logging.warning(
                 f"[cam_mapping] Incomplete cameras on align disk {al_ep!r}: missing views {missing_align} "
-                f"(required all of {cam_list_main!r}); resampling sample."
+                f"(required all of {ref_cam_list!r}); resampling sample."
             )
             raise IgnoreSample()
         # Validate readability and cross-view frame count consistency for ref and align episodes
@@ -1509,7 +1516,7 @@ class AlignmentDataset(Dataset):
             ('align', align_video_info, al_ep),
         ]:
             frame_counts = {}
-            for v in cam_list_main:
+            for v in ref_cam_list:
                 try:
                     cnt = AlignmentDataset._get_view_frame_count(ep_info, v)
                 except ValueError as exc:
@@ -1642,27 +1649,22 @@ class AlignmentDataset(Dataset):
         # _resolve_cam_list_main raises IgnoreSample if task key missing or any view absent on disk.
         # _cam_list_for_main_ref_align raises IgnoreSample if any view absent on ref/align disk.
         cam_list_main = self._resolve_cam_list_main(video_info, dataset_name, mapping)
+        ref_cam_list = self._resolve_cam_list_main(ref_video_info, dataset_name, mapping)
         cam_list = self._cam_list_for_main_ref_align(
-            cam_list_main, video_info, ref_video_info, align_video_info)
+            cam_list_main, video_info, ref_video_info, align_video_info, ref_cam_list)
         view = cam_list[0]
-        ref_view = view
-        align_view = view
+        ref_view = ref_cam_list[0]
+        align_view = ref_view
         image_dirs = cam_list
-        ref_image_dirs = cam_list
-        align_image_dirs = cam_list
+        ref_image_dirs = ref_cam_list
+        align_image_dirs = ref_cam_list
 
         main_files = self._get_files(video_info, view=view)
         ref_files = self._get_files(ref_video_info, view=ref_view)
         align_files = self._get_files(align_video_info, view=align_view)
 
-        if not main_files:
+        if not main_files or not ref_files or not align_files:
             return None  # Signal failure
-        if not ref_files:
-            ref_files = main_files
-            ref_video_info = video_info
-        if not align_files:
-            align_files = main_files
-            align_video_info = video_info
 
         main_video_dir = video_info.get('video_dir') if isinstance(video_info, dict) else video_info
         instruction_path = os.path.join(main_video_dir, 'instruction.txt')
@@ -1787,30 +1789,23 @@ class AlignmentDataset(Dataset):
 
         num_align = getattr(CONFIG.TRAIN, 'NUM_ALIGN_FRAMES', 24)
 
-        # Multi-view: JSON cam_list is normalized to exactly 3 views (cycle-pad if <3, first-3 truncate if >3).
-        # num_ctx = NUM_STEPS // num_views must be integral (set NUM_STEPS to a multiple of 3).
-        cam_list_ld = loaded_data.get('cam_list') if loaded_data is not None else None
-        assert cam_list_ld is not None
-        cam_list_ld = list(cam_list_ld)
-        n_cam = len(cam_list_ld)
-        if n_cam == 0:
-            raise IgnoreSample()
-        if n_cam < 3:
-            base = cam_list_ld
-            cam_list_ld = [base[i % len(base)] for i in range(3)]
-        elif n_cam > 3:
-            base = cam_list_ld
-            cam_list_ld = base[:3]
-        assert len(cam_list_ld) == 3
-        num_views = 3
-        num_ctx = CONFIG.DATA.NUM_STEPS // num_views   # frames per view per anchor
+        # Each side fills the same frame budget using its own native cameras.
+        cam_list_ld = loaded_data['cam_list']
+        ref_cam_list = loaded_data['ref_available_views']
+        num_views, ref_num_views = len(cam_list_ld), len(ref_cam_list)
+        if (CONFIG.DATA.NUM_STEPS <= 0 or num_align <= 0
+                or any(CONFIG.DATA.NUM_STEPS % n or num_align % n for n in (num_views, ref_num_views))):
+            raise ViewConfigurationError(
+                f"NUM_STEPS={CONFIG.DATA.NUM_STEPS} and NUM_ALIGN_FRAMES={num_align} "
+                f"must be positive multiples of each view count: {num_views}, {ref_num_views}")
+        num_ctx = CONFIG.DATA.NUM_STEPS // num_views
+        ref_num_ctx = CONFIG.DATA.NUM_STEPS // ref_num_views
 
         main_context_steps = self._get_context_steps(main_steps, len(main_files), video_path, num_context=num_ctx)
-        ref_context_steps = self._get_context_steps(ref_steps, len(ref_files), ref_video_path, num_context=num_ctx)
+        ref_context_steps = self._get_context_steps(ref_steps, len(ref_files), ref_video_path, num_context=ref_num_ctx)
 
         view = loaded_data['view']
 
-        # num_views and cam_list_ld already set above from loaded_data['cam_list'].
         ref_view = loaded_data.get('ref_view', view)
 
         main_frame_paths = self._context_steps_to_paths(main_context_steps, main_files)
@@ -1819,26 +1814,28 @@ class AlignmentDataset(Dataset):
                 main_frame_paths, view, cam_list_ld, num_ctx)
 
         final_ref_paths = self._context_steps_to_paths(ref_context_steps, ref_files)
-        if num_views > 1 and cam_list_ld:
+        if ref_num_views > 1:
             final_ref_paths, _ = self._apply_multiview_n_views(
-                final_ref_paths, ref_view, cam_list_ld, num_ctx)
+                final_ref_paths, ref_view, ref_cam_list, ref_num_ctx)
 
         # Build combined align: main (first half) + ref (second half).
         # Single-view: align_half = num_align per segment → 2*num_align total.
         # N-view:      align_half = num_align // num_views temporal positions per segment,
         #              then ×num_views views → num_align slots per segment → 2*num_align total.
         align_half = num_align // num_views
+        ref_align_half = num_align // ref_num_views
 
         main_align_idxs = get_stratified_idxs(len(main_files), align_half, mode=self.mode)
-        ref_align_idxs  = get_stratified_idxs(len(ref_files), align_half, mode=self.mode)
+        ref_align_idxs  = get_stratified_idxs(len(ref_files), ref_align_half, mode=self.mode)
         main_align_paths = [main_files[k] for k in main_align_idxs]
         ref_align_paths  = [ref_files[k]  for k in ref_align_idxs]
         if num_views > 1 and cam_list_ld:
             # n=1: frame-level interleave [v1_t0, v2_t0, ..., vN_t0, v1_t1, ...]
             main_align_paths, _ = self._apply_multiview_n_views(
                 main_align_paths, view, cam_list_ld, num_ctx=1)
+        if ref_num_views > 1:
             ref_align_paths, _  = self._apply_multiview_n_views(
-                ref_align_paths, ref_view, cam_list_ld, num_ctx=1)
+                ref_align_paths, ref_view, ref_cam_list, num_ctx=1)
         align_frame_paths_list     = main_align_paths + ref_align_paths
         main_align_frame_paths_list    = align_frame_paths_list
         num_align_frames_total = len(align_frame_paths_list)
@@ -1875,6 +1872,8 @@ class AlignmentDataset(Dataset):
         while True:
             try:
                 return self._get_item_impl(index)
+            except ViewConfigurationError:
+                raise
             except Exception as e:
                 video_idx = index // len(self.views)
                 video_path = self.video_paths[video_idx] if video_idx < len(self.video_paths) else "Unknown"
