@@ -75,6 +75,11 @@ CONFIG.JOINTS.USE_JOINTS = False     # set True + JOINT_ACTION_MAPPING_DIR to co
 
 ## Training
 
+Set `CONFIG.MODEL.BASE_MODEL.MODEL_PATH` in `config.py` to your local Hugging Face
+model directory before training. The backbone and processor both load from this
+directory during training and evaluation; it must contain the model weights,
+model configuration, tokenizer, and processor files.
+
 ```bash
 VIDEO_PATHS=/path/to/video_paths.json bash train_scripts/run_ds.sh
 ```

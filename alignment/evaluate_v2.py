@@ -170,10 +170,7 @@ def evaluate(argv):
   processor = None
   if 'Qwen' in CONFIG.MODEL.BASE_MODEL.NETWORK:
       try:
-          # TODO(open-source): internal-cluster path; eval-only, not exercised by the
-          # verified training run. Same planned fix as models.py/train.py. See
-          # OPEN_SOURCE_PATH_TODOS.md.
-          model_name = '/mnt/data/checkpoint/ethanchen/Qwen3/Qwen3-VL-Embedding-8B'
+          model_name = CONFIG.MODEL.BASE_MODEL.MODEL_PATH
           if is_master:
               logging.info(f"Loading processor for {model_name}")
           processor = AutoProcessor.from_pretrained(model_name, trust_remote_code=True)

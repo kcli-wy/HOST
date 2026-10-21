@@ -49,6 +49,8 @@ CONFIG.MODEL = edict()
 
 CONFIG.MODEL.BASE_MODEL = edict()
 CONFIG.MODEL.BASE_MODEL.NETWORK = 'Qwen3-VL-Embedding-8B'
+# Local Hugging Face model directory, shared by the backbone and processor.
+CONFIG.MODEL.BASE_MODEL.MODEL_PATH = '/mnt/data/checkpoint/ethanchen/Qwen3/Qwen3-VL-Embedding-8B'
 
 # Embedder params (LinearEmbedder, applied on top of the Qwen backbone).
 CONFIG.MODEL.CONV_EMBEDDER_MODEL = edict()
