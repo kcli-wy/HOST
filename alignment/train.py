@@ -37,11 +37,34 @@ flags.DEFINE_string('ds_config', 'scripts/ds_config.json', 'Path to DeepSpeed co
 flags.DEFINE_integer('save_interval', None, 'Number of steps between saving checkpoints.')
 flags.DEFINE_integer('max_iters', None, 'Total number of training steps.')
 flags.DEFINE_integer('num_align_frames', None, 'Number of frames to use for alignment.')
+flags.DEFINE_string('model_path', None, 'Local backbone and processor directory.')
+flags.DEFINE_string('cam_mapping_dir', None, 'Directory containing dataset camera mappings.')
+flags.DEFINE_boolean('use_joints', None, 'Override joint conditioning; disable for visual-only data.')
+flags.DEFINE_integer('micro_batch_size', None, 'Override per-GPU training micro batch size.')
+flags.DEFINE_integer('num_workers', None, 'Override data-loader worker count.')
+flags.DEFINE_integer('warmup_steps', None, 'Override scheduler warmup steps.')
+flags.DEFINE_integer('stop_after_steps', None, 'Stop at this global step without changing the scheduler horizon.')
 
 FLAGS = flags.FLAGS
 
 def train(argv):
   """Trains model and evaluates on relevant downstream tasks."""
+  if FLAGS.model_path is not None:
+      CONFIG.MODEL.BASE_MODEL.MODEL_PATH = FLAGS.model_path
+  if FLAGS.cam_mapping_dir is not None:
+      CONFIG.DATA.CAM_MAPPING_DIR = FLAGS.cam_mapping_dir
+  if FLAGS.use_joints is not None:
+      CONFIG.JOINTS.USE_JOINTS = FLAGS.use_joints
+  if FLAGS.micro_batch_size is not None:
+      if FLAGS.micro_batch_size < 1:
+          raise ValueError('micro_batch_size must be positive')
+      CONFIG.DS_CONFIG.train_micro_batch_size_per_gpu = FLAGS.micro_batch_size
+  if FLAGS.num_workers is not None:
+      if FLAGS.num_workers < 0:
+          raise ValueError('num_workers must be nonnegative')
+      CONFIG.DATA.NUM_WORKERS = FLAGS.num_workers
+  if FLAGS.warmup_steps is not None:
+      CONFIG.DS_CONFIG.scheduler.params.warmup_num_steps = FLAGS.warmup_steps
   if FLAGS.save_interval is not None:
       CONFIG.CHECKPOINT.SAVE_INTERVAL = FLAGS.save_interval
   
@@ -197,6 +220,9 @@ def train(argv):
           
       if is_master:
           logging.info(f"Resumed global_step: {global_step}")
+          logging.info(f"Restored engine step: {model_engine.global_steps}; "
+                       f"scheduler iteration: {getattr(scheduler, 'last_batch_iteration', None)}; "
+                       f"learning rate: {model_engine.get_lr()}")
   else:
       global_step = 0
       if is_master:
@@ -235,6 +261,10 @@ def train(argv):
                                 processor=processor)
 
   max_iters = CONFIG.TRAIN.MAX_ITERS
+  if FLAGS.stop_after_steps is not None:
+      if FLAGS.stop_after_steps < 1:
+          raise ValueError('stop_after_steps must be positive')
+      max_iters = min(max_iters, FLAGS.stop_after_steps)
   
   if is_master:
       logging.info('Starting training...')
@@ -276,8 +306,9 @@ def train(argv):
 
       model_engine.backward(loss)
 
+      is_update_step = model_engine.is_gradient_accumulation_boundary()
       model_engine.step()
-      if model_engine.is_gradient_accumulation_boundary():
+      if is_update_step:
           current_step += 1
           if is_master:
               pbar.update(1)
@@ -290,7 +321,7 @@ def train(argv):
           postfix = {'loss': loss.item(), 'lr': model_engine.get_lr()[0]}
           pbar.set_postfix(postfix)
       
-      if is_master and current_step % CONFIG.LOGGING.REPORT_INTERVAL == 0:
+      if is_master and is_update_step and current_step % CONFIG.LOGGING.REPORT_INTERVAL == 0:
           log_dict = {'loss': loss.item(), 'lr': model_engine.get_lr()[0]}
 
           if loss_dict:
@@ -312,7 +343,7 @@ def train(argv):
               log_dict['grad_norm'] = grad_norm
           wandb.log(log_dict, step=current_step)
           
-      if current_step % CONFIG.CHECKPOINT.SAVE_INTERVAL == 0 and current_step > 0:
+      if is_update_step and current_step % CONFIG.CHECKPOINT.SAVE_INTERVAL == 0 and current_step > 0:
           client_state = {'step': current_step}
           model_engine.save_checkpoint(logdir, current_step, client_state=client_state)
 

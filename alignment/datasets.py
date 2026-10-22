@@ -2029,7 +2029,7 @@ def create_dataset(split, mode, batch_size=None, return_iterator=True, distribut
     
     collator = AlignmentCollator(processor=processor, mode=mode)
 
-    num_workers = 12 if mode == 'train' else 12
+    num_workers = getattr(CONFIG.DATA, 'NUM_WORKERS', 12)
 
     dataloader = DataLoader(
         dataset,

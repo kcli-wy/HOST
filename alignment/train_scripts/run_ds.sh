@@ -33,8 +33,9 @@ BASE_PROJECT_NAME="host_alignment"
 # Synchronization logic for timestamp
 # Assuming RANK is provided by environment (e.g. SLURM_NODEID) or defaults to 0
 RANK=${RANK:-${SLURM_NODEID:-0}}
-mkdir -p "./train_sync"
-SYNC_FILE="./train_sync/tcc_timestamp_${BASE_PROJECT_NAME}"
+SYNC_DIR="${SYNC_DIR:-./train_sync}"
+mkdir -p "$SYNC_DIR"
+SYNC_FILE="$SYNC_DIR/tcc_timestamp_${BASE_PROJECT_NAME}"
 
 if [ "$RANK" -eq 0 ]; then
     TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -70,21 +71,21 @@ WORLD_SIZE=${WORLD_SIZE:-1}
 RANK=${RANK:-0}
 
 # Define arguments
-DS_CONFIG="scripts/ds_config_zero3.json"
+DS_CONFIG="${DS_CONFIG:-scripts/ds_config_zero3.json}"
 # To resume from a previous run, set: RESUME_DIR="/path/to/previous/run/logs/tcc_qwen_alignment_<timestamp>"
 
 # Calculate Gradient Accumulation Steps
 # Target: 4 / WORLD_SIZE (Nodes)
 # Ensure it is at least 1
-GRAD_ACCUM_STEPS=$((4 / WORLD_SIZE))
+GRAD_ACCUM_STEPS=${GRAD_ACCUM_STEPS:-$((4 / WORLD_SIZE))}
 if [ "$GRAD_ACCUM_STEPS" -lt 1 ]; then
     GRAD_ACCUM_STEPS=1
 fi
 echo "Setting Gradient Accumulation Steps to: $GRAD_ACCUM_STEPS (World Size: $WORLD_SIZE)"
 
-LOGDIR="logs/$WANDB_PROJECT"
-SAVE_INTERVAL=500
-MAX_ITERS=3000
+LOGDIR="${LOGDIR:-logs/$WANDB_PROJECT}"
+SAVE_INTERVAL=${SAVE_INTERVAL:-500}
+MAX_ITERS=${MAX_ITERS:-3000}
 ARGS="--alsologtostderr --logdir $LOGDIR --network $NETWORK --video_paths $VIDEO_PATHS --gradient_accumulation_steps $GRAD_ACCUM_STEPS --ds_config $DS_CONFIG --save_interval $SAVE_INTERVAL --max_iters $MAX_ITERS"
 
 if [ ! -z "$RESUME_DIR" ]; then
@@ -100,4 +101,4 @@ mkdir -p "$LOGDIR"
 # Launch with torchrun
 CMD="torchrun --nproc_per_node=$NUM_GPUS --nnodes=$WORLD_SIZE --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT train.py $ARGS"
 echo "Running: $CMD"
-$CMD
+$CMD "$@"
