@@ -73,21 +73,42 @@ CONFIG.DATA.SEGMENTED_PATH_DATASETS = ('AgiBotWorld', '10042')  # dataset ids us
 CONFIG.JOINTS.USE_JOINTS = False     # set True + JOINT_ACTION_MAPPING_DIR to condition on joint state
 ```
 
+The first camera in each mapping entry is the primary view. The loader pads one
+view to `[primary, primary, primary]` and two views to `[primary, secondary, primary]`.
+Main and Reference are padded independently for both context and alignment frames;
+three or more native views keep their order. Padding reuses frame paths without
+copying videos or editing camera mappings. With up to three native views, keep
+`NUM_STEPS=3`, `NUM_FRAMES=24`, and `NUM_ALIGN_FRAMES=24`.
+
 ## Training
 
-Set `CONFIG.MODEL.BASE_MODEL.MODEL_PATH` in `config.py` to your local Hugging Face
-model directory before training. The backbone and processor both load from this
-directory during training and evaluation; it must contain the model weights,
-model configuration, tokenizer, and processor files.
+Training defaults live in `config.py`: `CONFIG.DATA.VIDEO_PATHS` lists all six generated
+HumanGen manifests, `CONFIG.MODEL.BASE_MODEL.MODEL_PATH` selects the local model,
+`CONFIG.DATA.CAM_MAPPING_DIR` selects camera mappings, and `CONFIG.JOINTS.USE_JOINTS=False`
+enables visual-only training. Change `CONFIG.DATA.HUMANGEN_ROOT` to relocate the
+default manifests and camera mappings. Model weights, configuration, tokenizer, and
+processor files must all be present in the model directory. Command-line flags override
+the `VIDEO_PATHS`, `MODEL_PATH`, `CAM_MAPPING_DIR`, and `USE_JOINTS` environment variables;
+both override `config.py`. The launcher contains no defaults for these four settings.
 
 ```bash
-VIDEO_PATHS=/path/to/video_paths.json bash train_scripts/run_ds.sh
+bash train_scripts/run_ds.sh
 ```
 
-This wraps `train.py` with `torchrun` + DeepSpeed ZeRO-3. Key flags (see `train.py --help` for the
-full list): `--video_paths` (required), `--network` (`Qwen3-VL-Embedding-8B` is the verified path),
+This wraps `train.py` with `torchrun` + DeepSpeed ZeRO-2 and CPU optimizer offload, using
+`scripts/ds_config_zero2.json`. Set `DS_CONFIG` to select a different profile. Key flags (see `train.py --help` for the
+full list): `--video_paths` (overrides `CONFIG.DATA.VIDEO_PATHS`), `--network` (`Qwen3-VL-Embedding-8B` is the verified path),
 `--gradient_accumulation_steps`, `--ds_config`, `--save_interval`, `--max_iters`, `--resume_dir`,
 `--pretrain_weights`. `WANDB_API_KEY` falls back to offline logging if unset.
+
+Run the CPU regression checks in `HOST_Alignment` without datasets or model weights:
+
+```bash
+USE_TF=0 python -m unittest test_training_throughput -v
+```
+
+These check Qwen feature/gradient equivalence, multi-view frame ordering, reference-cache
+behavior, and data-loader worker reuse. Throughput and memory still require an actual GPU run.
 
 ## Evaluation
 

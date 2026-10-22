@@ -5,13 +5,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 NETWORK="${NETWORK:-Qwen3-VL-Embedding-8B}"
-VIDEO_PATHS="${VIDEO_PATHS:-}"
-
-if [ -z "${VIDEO_PATHS}" ]; then
-    echo "ERROR: set VIDEO_PATHS to your episode-list JSON before launching." >&2
-    echo "Example: VIDEO_PATHS=/path/to/video_paths.json bash train_scripts/run_ds.sh" >&2
-    exit 1
-fi
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 
 if [ -n "${CONDA_PREFIX:-}" ] && [ -x "${CONDA_PREFIX}/bin/nvcc" ]; then
   unset CUDA_HOME CUDA_PATH CUDAToolkit_ROOT
@@ -71,13 +65,12 @@ WORLD_SIZE=${WORLD_SIZE:-1}
 RANK=${RANK:-0}
 
 # Define arguments
-DS_CONFIG="${DS_CONFIG:-scripts/ds_config_zero3.json}"
+DS_CONFIG="${DS_CONFIG:-scripts/ds_config_zero2.json}"
 # To resume from a previous run, set: RESUME_DIR="/path/to/previous/run/logs/tcc_qwen_alignment_<timestamp>"
 
-# Calculate Gradient Accumulation Steps
-# Target: 4 / WORLD_SIZE (Nodes)
+# Per-GPU accumulation; global batch = micro batch * total GPUs * accumulation.
 # Ensure it is at least 1
-GRAD_ACCUM_STEPS=${GRAD_ACCUM_STEPS:-$((4 / WORLD_SIZE))}
+GRAD_ACCUM_STEPS=${GRAD_ACCUM_STEPS:-8}
 if [ "$GRAD_ACCUM_STEPS" -lt 1 ]; then
     GRAD_ACCUM_STEPS=1
 fi
@@ -86,7 +79,7 @@ echo "Setting Gradient Accumulation Steps to: $GRAD_ACCUM_STEPS (World Size: $WO
 LOGDIR="${LOGDIR:-logs/$WANDB_PROJECT}"
 SAVE_INTERVAL=${SAVE_INTERVAL:-500}
 MAX_ITERS=${MAX_ITERS:-3000}
-ARGS="--alsologtostderr --logdir $LOGDIR --network $NETWORK --video_paths $VIDEO_PATHS --gradient_accumulation_steps $GRAD_ACCUM_STEPS --ds_config $DS_CONFIG --save_interval $SAVE_INTERVAL --max_iters $MAX_ITERS"
+ARGS="--alsologtostderr --logdir $LOGDIR --network $NETWORK --gradient_accumulation_steps $GRAD_ACCUM_STEPS --ds_config $DS_CONFIG --save_interval $SAVE_INTERVAL --max_iters $MAX_ITERS"
 
 if [ ! -z "$RESUME_DIR" ]; then
     ARGS="$ARGS --resume_dir $RESUME_DIR"

@@ -186,10 +186,15 @@ class AlignmentCollator:
         for video_path, frame_list in video_frame_groups.items():
             try:
                 vr = decord.VideoReader(video_path, num_threads=1)
-                indices = [frame_idx for _, frame_idx, _, _ in frame_list]
+                # Decode each frame once, in timeline order, to avoid repeatedly
+                # seeking backwards between align frames and sampled chunks.
+                frame_sizes = {frame_idx: (width, height)
+                               for _, frame_idx, width, height in frame_list}
+                indices = sorted(frame_sizes)
                 frames_np = vr.get_batch(indices).asnumpy()
 
-                for i, (path_idx, frame_idx, target_w, target_h) in enumerate(frame_list):
+                for i, frame_idx in enumerate(indices):
+                    target_w, target_h = frame_sizes[frame_idx]
                     frame = frames_np[i]  # (H, W, C)
                     img = Image.fromarray(frame.astype(np.uint8)).convert('RGB')
 
@@ -506,8 +511,15 @@ class AlignmentCollator:
                 prepared.append(None)
                 continue
 
-            main_all = self.load_imgs(align + main_paths)
-            ref_all  = self.load_imgs(align + ref_paths) if ref_paths else []
+            main_count = len(align) + len(main_paths)
+            paths = align + main_paths
+            if ref_paths:
+                paths = paths + align + ref_paths
+            # Align frames are shared by both sequences. Decode the combined
+            # requests once, then keep independent augmentation calls below.
+            loaded = self.load_imgs(paths)
+            main_all = loaded[:main_count]
+            ref_all = loaded[main_count:]
 
             if do_augment:
                 jitter = self.color_jitter if self.do_color_jitter else None
@@ -775,18 +787,19 @@ class AlignmentCollator:
                 prepared=prepared)
             qwen_paired = self._assemble_qwen_dict(student_sink)
 
-            # Main-only: reuse prepared (no extra image load)
-            sink_main_only = self._build_qwen_input(
-                batch, context_size,
-                frame_paths_key='frame_paths',
-                ref_frame_paths_key=None,
-                do_augment=True,
-                update_metadata=True,
-                align_paths_key='_cached_align_paths',
-                prepared=prepared)
             collated_batch['qwen_input']           = qwen_paired
             collated_batch['qwen_input_paired']    = qwen_paired
-            collated_batch['qwen_input_main_only'] = self._assemble_qwen_dict(sink_main_only)
+            if self.mode == 'eval':
+                # Only evaluation can reuse cached reference embeddings.
+                sink_main_only = self._build_qwen_input(
+                    batch, context_size,
+                    frame_paths_key='frame_paths',
+                    ref_frame_paths_key=None,
+                    do_augment=True,
+                    update_metadata=True,
+                    align_paths_key='_cached_align_paths',
+                    prepared=prepared)
+                collated_batch['qwen_input_main_only'] = self._assemble_qwen_dict(sink_main_only)
 
         # Row-level logging metadata (aligned with student Qwen rows)
         collated_batch['aug_params']      = student_sink['aug_params']
@@ -1789,9 +1802,12 @@ class AlignmentDataset(Dataset):
 
         num_align = getattr(CONFIG.TRAIN, 'NUM_ALIGN_FRAMES', 24)
 
-        # Each side fills the same frame budget using its own native cameras.
-        cam_list_ld = loaded_data['cam_list']
-        ref_cam_list = loaded_data['ref_available_views']
+        # Fill three view slots by appending the primary camera after native views.
+        cam_list_ld = list(loaded_data['cam_list'])
+        ref_cam_list = list(loaded_data['ref_available_views'])
+        for views in (cam_list_ld, ref_cam_list):
+            if len(views) < 3:
+                views.extend([views[0]] * (3 - len(views)))
         num_views, ref_num_views = len(cam_list_ld), len(ref_cam_list)
         if (CONFIG.DATA.NUM_STEPS <= 0 or num_align <= 0
                 or any(CONFIG.DATA.NUM_STEPS % n or num_align % n for n in (num_views, ref_num_views))):
@@ -1819,7 +1835,6 @@ class AlignmentDataset(Dataset):
                 final_ref_paths, ref_view, ref_cam_list, ref_num_ctx)
 
         # Build combined align: main (first half) + ref (second half).
-        # Single-view: align_half = num_align per segment → 2*num_align total.
         # N-view:      align_half = num_align // num_views temporal positions per segment,
         #              then ×num_views views → num_align slots per segment → 2*num_align total.
         align_half = num_align // num_views
@@ -2037,6 +2052,7 @@ def create_dataset(split, mode, batch_size=None, return_iterator=True, distribut
         shuffle=shuffle,
         sampler=sampler,
         num_workers=num_workers,
+        persistent_workers=(num_workers > 0),
         pin_memory=True,
         drop_last=(mode == 'train'),
         collate_fn=collator,

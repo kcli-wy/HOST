@@ -50,7 +50,7 @@ CONFIG.MODEL = edict()
 CONFIG.MODEL.BASE_MODEL = edict()
 CONFIG.MODEL.BASE_MODEL.NETWORK = 'Qwen3-VL-Embedding-8B'
 # Local Hugging Face model directory, shared by the backbone and processor.
-CONFIG.MODEL.BASE_MODEL.MODEL_PATH = '/mnt/data/checkpoint/ethanchen/Qwen3/Qwen3-VL-Embedding-8B'
+CONFIG.MODEL.BASE_MODEL.MODEL_PATH = '/data/250010175/icl/HOST/Qwen3-VL-Embedding-8B'
 
 # Embedder params (LinearEmbedder, applied on top of the Qwen backbone).
 CONFIG.MODEL.CONV_EMBEDDER_MODEL = edict()
@@ -93,11 +93,16 @@ CONFIG.SPECIAL_TOKENS.ALIGN_END_TOKEN_ID = 151662  # <|fim_pad|> - 用于标记 
 # Data params
 # ******************************************************************************
 CONFIG.DATA = edict()
+CONFIG.DATA.HUMANGEN_ROOT = '/AOSS/HumanGen_alignment_paired_20261022_082425'
+CONFIG.DATA.VIDEO_PATHS = [
+    f'{CONFIG.DATA.HUMANGEN_ROOT}/{dataset}_video_paths.json'
+    for dataset in ('agibot', 'interna1', 'oxe', 'robocoin', 'robomind', 'robotwin')
+]
 CONFIG.DATA.RANDOM_OFFSET = 1
 CONFIG.DATA.NUM_STEPS = 3  # number of frames that will be embedded jointly,
 # Camera order for JSON training: {CAM_MAPPING_DIR}/{dataset_name}_cam_mapping.json (task_path -> [view names]).
-# For 3-camera setups, set NUM_STEPS to 6 so NUM_STEPS // num_views stays integral.
-CONFIG.DATA.CAM_MAPPING_DIR = '/open_data/cgy/cam_mapping'
+# The loader pads one or two native cameras to three slots using the primary view.
+CONFIG.DATA.CAM_MAPPING_DIR = f'{CONFIG.DATA.HUMANGEN_ROOT}/cam_mapping'
 CONFIG.DATA.USE_CAM_MAPPING = True
 CONFIG.DATA.FRAME_STRIDE = 10
 
@@ -168,6 +173,8 @@ CONFIG.DS_CONFIG.optimizer.params.lr = 0.00001
 CONFIG.DS_CONFIG.optimizer.params.betas = [0.9, 0.999]
 CONFIG.DS_CONFIG.optimizer.params.eps = 1e-8
 CONFIG.DS_CONFIG.optimizer.params.weight_decay = 0.00001
+# CPU offload uses DeepSpeed CPUAdam in AdamW mode.
+CONFIG.DS_CONFIG.optimizer.params.torch_adam = False
 
 CONFIG.DS_CONFIG.scheduler = edict()
 CONFIG.DS_CONFIG.scheduler.type = 'WarmupCosineLR'
@@ -181,7 +188,7 @@ CONFIG.DS_CONFIG.scheduler.params.cos_min_ratio = 0.3
 # Joint state tokenization params
 # ******************************************************************************
 CONFIG.JOINTS = edict()
-CONFIG.JOINTS.USE_JOINTS = True
+CONFIG.JOINTS.USE_JOINTS = False
 CONFIG.JOINTS.NUM_BINS = 192
 CONFIG.JOINTS.JOINT_ACTION_MAPPING_DIR = '/open_data/cgy/joint_action_mapping'
 

@@ -30,16 +30,16 @@ flags.DEFINE_boolean(
     'By default switched off to prevent overwriting existing '
     'experiments.')
 flags.DEFINE_string('network', 'Qwen3-VL-Embedding-8B', 'Base network to use (must contain "Qwen3-VL").')
-flags.DEFINE_string('video_paths', None, 'Comma-separated list of paths to video_paths.json.')
+flags.DEFINE_string('video_paths', os.environ.get('VIDEO_PATHS') or None, 'Comma-separated list of paths to video_paths.json.')
 flags.DEFINE_integer('local_rank', -1, 'Local rank for distributed training')
 flags.DEFINE_integer('gradient_accumulation_steps', 1, 'Gradient accumulation steps.')
-flags.DEFINE_string('ds_config', 'scripts/ds_config.json', 'Path to DeepSpeed config json.')
+flags.DEFINE_string('ds_config', 'scripts/ds_config_zero2.json', 'Path to DeepSpeed config json.')
 flags.DEFINE_integer('save_interval', None, 'Number of steps between saving checkpoints.')
 flags.DEFINE_integer('max_iters', None, 'Total number of training steps.')
 flags.DEFINE_integer('num_align_frames', None, 'Number of frames to use for alignment.')
-flags.DEFINE_string('model_path', None, 'Local backbone and processor directory.')
-flags.DEFINE_string('cam_mapping_dir', None, 'Directory containing dataset camera mappings.')
-flags.DEFINE_boolean('use_joints', None, 'Override joint conditioning; disable for visual-only data.')
+flags.DEFINE_string('model_path', os.environ.get('MODEL_PATH') or None, 'Local backbone and processor directory.')
+flags.DEFINE_string('cam_mapping_dir', os.environ.get('CAM_MAPPING_DIR') or None, 'Directory containing dataset camera mappings.')
+flags.DEFINE_boolean('use_joints', os.environ.get('USE_JOINTS') or None, 'Override joint conditioning; disable for visual-only data.')
 flags.DEFINE_integer('micro_batch_size', None, 'Override per-GPU training micro batch size.')
 flags.DEFINE_integer('num_workers', None, 'Override data-loader worker count.')
 flags.DEFINE_integer('warmup_steps', None, 'Override scheduler warmup steps.')
@@ -49,6 +49,8 @@ FLAGS = flags.FLAGS
 
 def train(argv):
   """Trains model and evaluates on relevant downstream tasks."""
+  if FLAGS.video_paths is not None:
+      CONFIG.DATA.VIDEO_PATHS = FLAGS.video_paths
   if FLAGS.model_path is not None:
       CONFIG.MODEL.BASE_MODEL.MODEL_PATH = FLAGS.model_path
   if FLAGS.cam_mapping_dir is not None:
@@ -257,7 +259,7 @@ def train(argv):
                                 batch_size=model_engine.train_micro_batch_size_per_gpu(),
                                 return_iterator=True,
                                 distributed=True, # DeepSpeed is always distributed
-                                video_paths_json=FLAGS.video_paths,
+                                video_paths_json=CONFIG.DATA.VIDEO_PATHS,
                                 processor=processor)
 
   max_iters = CONFIG.TRAIN.MAX_ITERS
@@ -362,6 +364,9 @@ def train(argv):
                       logging.info(f"Saved Qwen model in HF format to {save_path}")
               except Exception as e:
                   logging.error(f"Failed to save Qwen model in HF format: {e}")
+
+      if current_step >= max_iters:
+          break
 
   if is_master:
       pbar.close()

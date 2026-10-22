@@ -58,8 +58,9 @@ class BaseModel(nn.Module):
                 'attention_mask': inputs['attention_mask'],
                 'pixel_values': inputs['pixel_values'],
                 'image_grid_thw': inputs['image_grid_thw'],
-                'output_hidden_states': True,
-                'return_dict': True
+                'output_hidden_states': False,
+                'return_dict': True,
+                'use_cache': False,
             }
             
             if 'pixel_values_videos' in inputs and inputs['pixel_values_videos'] is not None:
@@ -77,11 +78,12 @@ class BaseModel(nn.Module):
                 if 'cls_token_id' in inputs:
                     forward_kwargs['cls_token_id'] = inputs['cls_token_id']
 
-            outputs = self.base_model(**forward_kwargs)
+            # Alignment consumes features, so skip the vocabulary projection and
+            # avoid retaining intermediate decoder states or generation KV caches.
+            outputs = self.base_model.model(**forward_kwargs)
             
             # Extract features: Average pool image tokens from last hidden state
-            # Qwen3VLCausalLMOutputWithPast does not have last_hidden_state attribute, use hidden_states[-1]
-            hidden_states = outputs.hidden_states[-1] # (Total_Frames, Seq_Len, Hidden_Size)
+            hidden_states = outputs.last_hidden_state # (Total_Frames, Seq_Len, Hidden_Size)
 
             input_ids = inputs['input_ids']
 

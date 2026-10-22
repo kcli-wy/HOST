@@ -1,88 +1,113 @@
+# Alignment environment with the verified CUDA 12.4 / GCC 12 toolchain.
+# Build strings and machine paths are omitted; TensorFlow/Keras are excluded.
+# PyTorch cu124 supplies its matching cuDNN and NCCL runtime wheels.
+# NumPy is managed by Conda to avoid overlapping Conda/pip installations.
+# After activating the new environment, configure OpenGL library discovery:
+# conda env config vars set -n HOST_Alignment LIBRARY_PATH="$CONDA_PREFIX/lib"
+# conda deactivate && conda activate HOST_Alignment
+#
+# Decord 0.6.0's upstream py3 wheel has a cp36 tag and stale RECORD hashes.
+# The verified environment uses the same code with corrected wheel metadata.
+# To reproduce: extract the wheel with `python -m zipfile -e <wheel> <dir>`,
+# set decord-0.6.0.dist-info/WHEEL's Tag to py3-none-manylinux2010_x86_64,
+# rebuild with `python -m wheel pack <dir> -d <wheelhouse>`, and install with
+# `python -m pip install --force-reinstall --no-deps <rebuilt-wheel>`.
 name: HOST_Alignment
 channels:
   - conda-forge
-  - nvidia
+  - nvidia/label/cuda-12.4.1
 dependencies:
   - _libgcc_mutex=0.1
   - _openmp_mutex=4.5
   - _x86_64-microarch-level=4
   - absl-py=2.3.1
-  - astunparse=1.6.3
+  - alsa-lib=1.2.16.1
   - backports.zstd=1.2.0
-  - binutils_impl_linux-64=2.45
-  - binutils_linux-64=2.45
+  - binutils=2.45.1
+  - binutils_impl_linux-64=2.45.1
+  - binutils_linux-64=2.45.1
   - brotli-python=1.2.0
   - bzip2=1.0.8
   - c-ares=1.34.6
-  - ca-certificates=2026.1.4
+  - c-compiler=1.7.0
+  - ca-certificates=2026.7.22
   - cached-property=1.5.2
   - cached_property=1.5.2
-  - certifi=2026.1.4
+  - cccl=2.3.2
+  - certifi=2026.7.22
   - charset-normalizer=3.4.4
+  - conda-gcc-specs=12.4.0
   - conda-pack=0.8.1
-  - cuda-cccl_linux-64=12.9.27
-  - cuda-command-line-tools=12.9.1
-  - cuda-compiler=12.9.1
-  - cuda-crt-dev_linux-64=12.9.86
-  - cuda-crt-tools=12.9.86
-  - cuda-cudart=12.9.79
-  - cuda-cudart-dev=12.9.79
-  - cuda-cudart-dev_linux-64=12.9.79
-  - cuda-cudart-static=12.9.79
-  - cuda-cudart-static_linux-64=12.9.79
-  - cuda-cudart_linux-64=12.9.79
-  - cuda-cuobjdump=12.9.82
-  - cuda-cupti=12.9.79
-  - cuda-cupti-dev=12.9.79
-  - cuda-cuxxfilt=12.9.82
+  - cuda-cccl=12.4.127
+  - cuda-cccl_linux-64=12.4.127
+  - cuda-command-line-tools=12.4.1
+  - cuda-compiler=12.4.1
+  - cuda-crt-dev_linux-64=12.4.131
+  - cuda-crt-tools=12.4.131
+  - cuda-cudart=12.4.127
+  - cuda-cudart-dev=12.4.127
+  - cuda-cudart-dev_linux-64=12.4.127
+  - cuda-cudart-static=12.4.127
+  - cuda-cudart-static_linux-64=12.4.127
+  - cuda-cudart_linux-64=12.4.127
+  - cuda-cuobjdump=12.4.127
+  - cuda-cupti=12.4.127
+  - cuda-cupti-dev=12.4.127
+  - cuda-cuxxfilt=12.4.127
   - cuda-documentation=12.4.127
-  - cuda-driver-dev=12.9.79
-  - cuda-driver-dev_linux-64=12.9.79
-  - cuda-gdb=12.9.79
-  - cuda-libraries=12.9.1
-  - cuda-libraries-dev=12.9.1
-  - cuda-libraries-static=12.9.1
-  - cuda-nsight=12.9.79
-  - cuda-nvcc=12.9.86
-  - cuda-nvcc-dev_linux-64=12.9.86
-  - cuda-nvcc-impl=12.9.86
-  - cuda-nvcc-tools=12.9.86
-  - cuda-nvcc_linux-64=12.9.86
-  - cuda-nvdisasm=12.9.88
-  - cuda-nvml-dev=12.9.79
-  - cuda-nvprof=12.9.79
-  - cuda-nvprune=12.9.82
-  - cuda-nvrtc=12.9.86
-  - cuda-nvrtc-dev=12.9.86
-  - cuda-nvrtc-static=12.9.86
-  - cuda-nvtx=12.9.79
-  - cuda-nvvm-dev_linux-64=12.9.86
-  - cuda-nvvm-impl=12.9.86
-  - cuda-nvvm-tools=12.9.86
-  - cuda-nvvp=12.9.79
-  - cuda-opencl=12.9.19
-  - cuda-opencl-dev=12.9.19
-  - cuda-profiler-api=12.9.79
-  - cuda-sanitizer-api=12.9.79
+  - cuda-driver-dev=12.4.127
+  - cuda-driver-dev_linux-64=12.4.127
+  - cuda-gdb=12.4.127
+  - cuda-libraries=12.4.1
+  - cuda-libraries-dev=12.4.1
+  - cuda-libraries-static=12.4.1
+  - cuda-nsight=12.4.127
+  - cuda-nvcc=12.4.131
+  - cuda-nvcc-dev_linux-64=12.4.131
+  - cuda-nvcc-impl=12.4.131
+  - cuda-nvcc-tools=12.4.131
+  - cuda-nvcc_linux-64=12.4.131
+  - cuda-nvdisasm=12.4.127
+  - cuda-nvml-dev=12.4.127
+  - cuda-nvprof=12.4.127
+  - cuda-nvprune=12.4.127
+  - cuda-nvrtc=12.4.127
+  - cuda-nvrtc-dev=12.4.127
+  - cuda-nvrtc-static=12.4.127
+  - cuda-nvtx=12.4.127
+  - cuda-nvvm-dev_linux-64=12.4.131
+  - cuda-nvvm-impl=12.4.131
+  - cuda-nvvm-tools=12.4.131
+  - cuda-nvvp=12.4.127
+  - cuda-opencl=12.4.127
+  - cuda-opencl-dev=12.4.127
+  - cuda-profiler-api=12.4.127
+  - cuda-sanitizer-api=12.4.127
   - cuda-toolkit=12.4.1
-  - cuda-tools=12.9.1
-  - cuda-version=12.9
-  - cuda-visual-tools=12.9.1
-  - cudnn=9.10.2.21
+  - cuda-tools=12.4.1
+  - cuda-version=12.4
+  - cuda-visual-tools=12.4.1
+  - cxx-compiler=1.7.0
   - dbus=1.16.2
   - expat=2.7.3
-  - flatbuffers=25.2.10
+  - font-ttf-dejavu-sans-mono=2.37
+  - font-ttf-inconsolata=3.000
+  - font-ttf-source-code-pro=2.038
+  - font-ttf-ubuntu=0.83
   - fontconfig=2.15.0
+  - fonts-conda-ecosystem=1
+  - fonts-conda-forge=1
   - freetype=2.14.1
-  - gast=0.7.0
-  - gcc_impl_linux-64=14.3.0
-  - gcc_linux-64=14.3.0
-  - gds-tools=1.14.1.1
+  - gcc=12.4.0
+  - gcc_impl_linux-64=12.4.0
+  - gcc_linux-64=12.4.0
+  - gdb=14.2
+  - gds-tools=1.9.1.3
   - giflib=5.2.2
   - gmp=6.3.0
-  - google-pasta=0.2.0
-  - gxx_impl_linux-64=14.3.0
-  - gxx_linux-64=14.3.0
+  - gxx=12.4.0
+  - gxx_impl_linux-64=12.4.0
+  - gxx_linux-64=12.4.0
   - h2=4.3.0
   - h5py=3.15.1
   - hdf5=1.14.6
@@ -94,33 +119,31 @@ dependencies:
   - kernel-headers_linux-64=5.14.0
   - keyutils=1.6.3
   - krb5=1.21.3
-  - ld_impl_linux-64=2.45
+  - ld_impl_linux-64=2.45.1
   - lerc=4.0.0
-  - libabseil=20250512.1
   - libaec=1.1.4
   - libblas=3.11.0
+  - libcap=2.78
   - libcblas=3.11.0
-  - libcublas=12.9.1.4
-  - libcublas-dev=12.9.1.4
-  - libcublas-static=12.9.1.4
-  - libcudnn=9.10.2.21
-  - libcudnn-dev=9.10.2.21
-  - libcufft=11.4.1.4
-  - libcufft-dev=11.4.1.4
-  - libcufft-static=11.4.1.4
-  - libcufile=1.14.1.1
-  - libcufile-dev=1.14.1.1
-  - libcufile-static=1.14.1.1
-  - libcurand=10.3.10.19
-  - libcurand-dev=10.3.10.19
-  - libcurand-static=10.3.10.19
+  - libcublas=12.4.5.8
+  - libcublas-dev=12.4.5.8
+  - libcublas-static=12.4.5.8
+  - libcufft=11.2.1.3
+  - libcufft-dev=11.2.1.3
+  - libcufft-static=11.2.1.3
+  - libcufile=1.9.1.3
+  - libcufile-dev=1.9.1.3
+  - libcufile-static=1.9.1.3
+  - libcurand=10.3.5.147
+  - libcurand-dev=10.3.5.147
+  - libcurand-static=10.3.5.147
   - libcurl=8.17.0
-  - libcusolver=11.7.5.82
-  - libcusolver-dev=11.7.5.82
-  - libcusolver-static=11.7.5.82
-  - libcusparse=12.5.10.65
-  - libcusparse-dev=12.5.10.65
-  - libcusparse-static=12.5.10.65
+  - libcusolver=11.6.1.9
+  - libcusolver-dev=11.6.1.9
+  - libcusolver-static=11.6.1.9
+  - libcusparse=12.3.1.170
+  - libcusparse-dev=12.3.1.170
+  - libcusparse-static=12.3.1.170
   - libdeflate=1.25
   - libedit=3.1.20250104
   - libev=4.33
@@ -129,71 +152,73 @@ dependencies:
   - libfreetype=2.14.1
   - libfreetype6=2.14.1
   - libgcc=15.2.0
-  - libgcc-devel_linux-64=14.3.0
+  - libgcc-devel_linux-64=12.4.0
   - libgcc-ng=15.2.0
   - libgfortran=15.2.0
+  - libgfortran-ng=15.2.0
   - libgfortran5=15.2.0
+  - libgl=1.7.0
+  - libgl-devel=1.7.0
   - libglib=2.86.3
+  - libglvnd=1.7.0
+  - libglx=1.7.0
+  - libglx-devel=1.7.0
   - libgomp=15.2.0
-  - libgrpc=1.73.1
   - libiconv=1.18
   - libjpeg-turbo=3.1.2
   - liblapack=3.11.0
   - liblzma=5.8.1
-  - libml_dtypes-headers=0.5.4
+  - liblzma-devel=5.8.1
   - libnghttp2=1.67.0
-  - libnpp=12.4.1.87
-  - libnpp-dev=12.4.1.87
-  - libnpp-static=12.4.1.87
+  - libnl=3.11.0
+  - libnpp=12.2.5.30
+  - libnpp-dev=12.2.5.30
+  - libnpp-static=12.2.5.30
   - libnsl=2.0.1
-  - libnvfatbin=12.9.82
-  - libnvfatbin-dev=12.9.82
-  - libnvfatbin-static=12.9.82
-  - libnvjitlink=12.9.86
-  - libnvjitlink-dev=12.9.86
-  - libnvjitlink-static=12.9.86
-  - libnvjpeg=12.4.0.76
-  - libnvjpeg-dev=12.4.0.76
-  - libnvjpeg-static=12.4.0.76
-  - libnvptxcompiler-dev=12.9.86
-  - libnvptxcompiler-dev_linux-64=12.9.86
+  - libnuma=2.0.18
+  - libnvfatbin=12.4.127
+  - libnvfatbin-dev=12.4.127
+  - libnvfatbin-static=12.4.127
+  - libnvjitlink=12.4.127
+  - libnvjitlink-dev=12.4.127
+  - libnvjitlink-static=12.4.127
+  - libnvjpeg=12.3.1.117
+  - libnvjpeg-dev=12.3.1.117
+  - libnvjpeg-static=12.3.1.117
   - libopenblas=0.3.30
+  - libopengl=1.7.0
   - libpng=1.6.53
-  - libprotobuf=6.31.1
-  - libre2-11=2025.11.05
-  - libsanitizer=14.3.0
+  - libsanitizer=12.4.0
   - libsqlite=3.51.1
   - libssh2=1.11.1
   - libstdcxx=15.2.0
-  - libstdcxx-devel_linux-64=14.3.0
+  - libstdcxx-devel_linux-64=12.4.0
   - libstdcxx-ng=15.2.0
-  - libtensorflow_cc=2.19.1
-  - libtensorflow_framework=2.19.1
+  - libsystemd0=262
   - libtiff=4.7.1
+  - libudev1=262
   - libuuid=2.41.2
   - libwebp=1.6.0
   - libwebp-base=1.6.0
   - libxcb=1.17.0
   - libxcrypt=4.4.36
   - libxkbcommon=1.13.1
+  - libxkbfile=1.1.0
   - libxml2=2.15.1
   - libxml2-16=2.15.1
   - libzlib=1.3.1
-  - markdown=3.10
   - markdown-it-py=4.0.0
   - mdurl=0.1.2
-  - ml_dtypes=0.5.4
-  - namex=0.1.0
-  - nccl=2.28.9.1
+  - mpfr=4.2.2
   - ncurses=6.5
-  - nsight-compute=2025.2.1.3
+  - nsight-compute=2024.1.1.4
   - nspr=4.38
   - nss=3.118
+  - numpy=1.26.4
   - ocl-icd=2.3.3
   - opencl-headers=2025.06.13
-  - openssl=3.6.1
+  - openssl=3.6.5
   - opt_einsum=3.4.0
-  - optree=0.18.0
   - packaging=25.0
   - pcre2=10.47
   - pip=25.3
@@ -201,31 +226,51 @@ dependencies:
   - pygments=2.19.2
   - pysocks=1.7.1
   - python=3.10.19
-  - python-flatbuffers=25.9.23
   - python_abi=3.10
-  - re2=2025.11.05
+  - rdma-core=65.0
   - readline=8.2
   - requests=2.32.5
   - rich=14.2.0
   - setuptools=80.9.0
   - six=1.17.0
-  - snappy=1.2.2
   - sysroot_linux-64=2.34
-  - tensorflow=2.19.1
   - termcolor=3.2.0
   - tk=8.6.13
   - typing-extensions=4.15.0
   - typing_extensions=4.15.0
   - urllib3=2.6.1
-  - werkzeug=3.1.4
+  - wayland=1.24.0
   - wheel=0.45.1
+  - xcb-util=0.4.1
+  - xcb-util-cursor=0.1.6
+  - xcb-util-image=0.4.0
+  - xcb-util-keysyms=0.4.1
+  - xcb-util-renderutil=0.3.10
+  - xcb-util-wm=0.4.2
   - xkeyboard-config=2.46
+  - xorg-libice=1.1.2
+  - xorg-libsm=1.2.6
   - xorg-libx11=1.8.12
   - xorg-libxau=1.0.12
+  - xorg-libxcomposite=0.4.7
+  - xorg-libxdamage=1.1.6
   - xorg-libxdmcp=1.1.5
+  - xorg-libxext=1.3.7
+  - xorg-libxfixes=6.0.2
+  - xorg-libxi=1.8.2
+  - xorg-libxrandr=1.5.5
+  - xorg-libxrender=0.9.12
+  - xorg-libxtst=1.2.5
+  - xorg-xorgproto=2025.1
+  - xz=5.8.1
+  - xz-gpl-tools=5.8.1
+  - xz-tools=5.8.1
   - zipp=3.23.0
+  - zlib=1.3.1
   - zstd=1.5.7
   - pip:
+      - --index-url https://mirrors.cernet.edu.cn/pypi/web/simple
+      - --extra-index-url https://mirror.nju.edu.cn/pytorch/whl/cu124
       - accelerate==1.12.0
       - aiofiles==23.2.1
       - aiohappyeyeballs==2.6.1
@@ -235,14 +280,12 @@ dependencies:
       - annotated-types==0.7.0
       - antlr4-python3-runtime==4.9.3
       - anyio==4.12.0
-      - array-record==0.8.1
       - asttokens==3.0.1
       - async-timeout==5.0.1
       - attrs==25.4.0
       - av==16.0.1
       - bddl==3.6.0
       - blessed==1.25.0
-      - cachetools==6.2.2
       - click==8.3.1
       - cloudpickle==3.1.2
       - contourpy==1.3.2
@@ -252,7 +295,6 @@ dependencies:
       - decord==0.6.0
       - deepspeed==0.14.4
       - dill==0.4.0
-      - dm-tree==0.1.9
       - docstring-parser==0.17.0
       - dtaidistance==2.3.13
       - easydict==1.13
@@ -264,7 +306,7 @@ dependencies:
       - fastjsonschema==2.21.2
       - ffmpy==1.0.0
       - filelock==3.19.1
-      - flash-attn==2.6.0
+      - flash-attn==2.6.0.post1
       - fonttools==4.61.0
       - freetype-py==2.5.1
       - frozenlist==1.8.0
@@ -273,12 +315,9 @@ dependencies:
       - gitdb==4.0.12
       - gitpython==3.1.45
       - glfw==2.10.0
-      - google-auth==2.41.1
-      - google-auth-oauthlib==1.2.3
       - gpustat==1.1.1
       - gradio==4.44.0
       - gradio-client==1.3.0
-      - grpcio==1.76.0
       - gym==0.26.2
       - gym-notices==0.1.0
       - h11==0.16.0
@@ -290,7 +329,6 @@ dependencies:
       - hydra-core==1.3.2
       - imageio==2.37.2
       - imageio-ffmpeg==0.6.0
-      - immutabledict==4.2.2
       - importlib-resources==6.5.2
       - iniconfig==2.3.0
       - ipython==8.37.0
@@ -302,7 +340,6 @@ dependencies:
       - jupyter-core==5.9.1
       - jupytext==1.18.1
       - kiwisolver==1.4.9
-      - libclang==18.1.1
       - liger-kernel==0.6.4
       - lightning-utilities==0.15.2
       - llvmlite==0.46.0
@@ -311,7 +348,6 @@ dependencies:
       - matplotlib-inline==0.2.1
       - maturin==1.11.5
       - mdit-py-plugins==0.5.0
-      - ml-dtypes==0.2.0
       - moviepy==2.2.1
       - mpmath==1.3.0
       - msgpack==1.1.2
@@ -323,7 +359,6 @@ dependencies:
       - ninja==1.13.0
       - nltk==3.9.2
       - numba==0.63.1
-      - numpy==1.26.4
       - numpydantic==1.6.8
       - nvidia-cublas-cu12==12.4.2.65
       - nvidia-cuda-cupti-cu12==12.4.99
@@ -338,9 +373,8 @@ dependencies:
       - nvidia-nccl-cu12==2.20.5
       - nvidia-nvjitlink-cu12==12.4.99
       - nvidia-nvtx-cu12==12.4.99
-      - oauthlib==3.3.1
       - omegaconf==2.3.0
-      - opencv-python==4.12.0.88
+      - opencv-python==4.11.0.86
       - orjson==3.11.5
       - pandas==2.3.3
       - parso==0.8.5
@@ -349,22 +383,19 @@ dependencies:
       - platformdirs==4.5.1
       - pluggy==1.6.0
       - proglog==0.1.12
-      - promise==2.3
       - prompt-toolkit==3.0.52
       - propcache==0.4.1
-      - protobuf==4.25.8
+      - protobuf==6.31.1
       - psutil==7.1.3
       - ptyprocess==0.7.0
       - pure-eval==0.2.3
       - py-cpuinfo==9.0.0
       - pyarrow==22.0.0
-      - pyasn1==0.6.1
-      - pyasn1-modules==0.4.2
       - pydantic==2.8.2
       - pydantic-core==2.20.1
       - pydub==0.25.1
       - pyglet==2.1.11
-      - pyopengl==3.1.10
+      - pyopengl==3.1.0
       - pyparsing==3.2.5
       - pyrender==0.1.45
       - pytest==9.0.2
@@ -377,10 +408,8 @@ dependencies:
       - qwen-vl-utils==0.0.14
       - referencing==0.37.0
       - regex==2025.11.3
-      - requests-oauthlib==2.0.0
       - robosuite==1.4.0
       - rpds-py==0.30.0
-      - rsa==4.9.1
       - ruff==0.14.8
       - safetensors==0.7.0
       - scipy==1.15.3
@@ -392,8 +421,6 @@ dependencies:
       - stack-data==0.6.3
       - starlette==0.50.0
       - sympy==1.14.0
-      - tensorboard==2.20.0
-      - tensorboard-data-server==0.7.2
       - tiktoken==0.6.0
       - tokenizers==0.22.1
       - toml==0.10.2
@@ -418,6 +445,5 @@ dependencies:
       - wandb==0.23.1
       - wcwidth==0.2.14
       - websockets==12.0
-      - wrapt==1.14.2
       - xxhash==3.6.0
       - yarl==1.22.0
