@@ -78,7 +78,7 @@ echo "Setting Gradient Accumulation Steps to: $GRAD_ACCUM_STEPS (World Size: $WO
 
 LOGDIR="${LOGDIR:-logs/$WANDB_PROJECT}"
 SAVE_INTERVAL=${SAVE_INTERVAL:-500}
-MAX_ITERS=${MAX_ITERS:-3000}
+MAX_ITERS=${MAX_ITERS:-5000}
 ARGS="--alsologtostderr --logdir $LOGDIR --network $NETWORK --gradient_accumulation_steps $GRAD_ACCUM_STEPS --ds_config $DS_CONFIG --save_interval $SAVE_INTERVAL --max_iters $MAX_ITERS"
 
 if [ ! -z "$RESUME_DIR" ]; then

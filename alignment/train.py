@@ -30,7 +30,7 @@ flags.DEFINE_boolean(
     'By default switched off to prevent overwriting existing '
     'experiments.')
 flags.DEFINE_string('network', 'Qwen3-VL-Embedding-8B', 'Base network to use (must contain "Qwen3-VL").')
-flags.DEFINE_string('video_paths', os.environ.get('VIDEO_PATHS') or None, 'Comma-separated list of paths to video_paths.json.')
+flags.DEFINE_string('video_paths', None, 'Comma-separated list of paths to video_paths.json.')
 flags.DEFINE_integer('local_rank', -1, 'Local rank for distributed training')
 flags.DEFINE_integer('gradient_accumulation_steps', 1, 'Gradient accumulation steps.')
 flags.DEFINE_string('ds_config', 'scripts/ds_config_zero2.json', 'Path to DeepSpeed config json.')

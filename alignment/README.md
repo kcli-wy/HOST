@@ -11,11 +11,13 @@ coupled prediction targets.
 
 ## Index
 
-- [File Structure](#file-structure)
-- [Environment Setup](#environment-setup)
-- [Data Preparation](#data-preparation)
-- [Training](#training)
-- [Evaluation](#evaluation)
+- [Target Coupling (alignment/)](#target-coupling-alignment)
+  - [Index](#index)
+  - [File Structure](#file-structure)
+  - [Environment Setup](#environment-setup)
+  - [Data Preparation](#data-preparation)
+  - [Training](#training)
+  - [Evaluation](#evaluation)
 
 ## File Structure
 
@@ -50,8 +52,8 @@ image/video processor stack.
 `alignment/` and `policy_training/` consume the same on-disk data convention — see
 [`data_preprocessing/README.md`](../data_preprocessing/README.md) at the repo root for the full,
 single-source-of-truth schema (video-paths list, episode directory layout, camera mapping,
-joint/action normalization) and the task-grouping scripts that build `task_paths.json`. Pass your
-own episode-list JSON through the `VIDEO_PATHS` environment variable when launching `run_ds.sh`.
+joint/action normalization) and the task-grouping scripts that build `task_paths.json`. Set
+`CONFIG.DATA.VIDEO_PATHS` in `config.py` to your episode-list JSON files.
 
 `alignment/` specifically needs only video frames plus task grouping (`task_paths.json`) — no
 robot actions/joint data are required unless you enable joint conditioning
@@ -82,22 +84,17 @@ copying videos or editing camera mappings. With up to three native views, keep
 
 ## Training
 
-Training defaults live in `config.py`: `CONFIG.DATA.VIDEO_PATHS` lists all six generated
-HumanGen manifests, `CONFIG.MODEL.BASE_MODEL.MODEL_PATH` selects the local model,
-`CONFIG.DATA.CAM_MAPPING_DIR` selects camera mappings, and `CONFIG.JOINTS.USE_JOINTS=False`
-enables visual-only training. Change `CONFIG.DATA.HUMANGEN_ROOT` to relocate the
-default manifests and camera mappings. Model weights, configuration, tokenizer, and
-processor files must all be present in the model directory. Command-line flags override
-the `VIDEO_PATHS`, `MODEL_PATH`, `CAM_MAPPING_DIR`, and `USE_JOINTS` environment variables;
-both override `config.py`. The launcher contains no defaults for these four settings.
+Set `CONFIG.MODEL.BASE_MODEL.MODEL_PATH` in `config.py` to your local Hugging Face
+model directory before training. The backbone and processor both load from this
+directory during training and evaluation; it must contain the model weights,
+model configuration, tokenizer, and processor files.
 
 ```bash
 bash train_scripts/run_ds.sh
 ```
 
-This wraps `train.py` with `torchrun` + DeepSpeed ZeRO-2 and CPU optimizer offload, using
-`scripts/ds_config_zero2.json`. Set `DS_CONFIG` to select a different profile. Key flags (see `train.py --help` for the
-full list): `--video_paths` (overrides `CONFIG.DATA.VIDEO_PATHS`), `--network` (`Qwen3-VL-Embedding-8B` is the verified path),
+This wraps `train.py` with `torchrun` + DeepSpeed ZeRO-3. Key flags (see `train.py --help` for the
+full list): `--video_paths` (required), `--network` (`Qwen3-VL-Embedding-8B` is the verified path),
 `--gradient_accumulation_steps`, `--ds_config`, `--save_interval`, `--max_iters`, `--resume_dir`,
 `--pretrain_weights`. `WANDB_API_KEY` falls back to offline logging if unset.
 
@@ -113,7 +110,7 @@ behavior, and data-loader worker reuse. Throughput and memory still require an a
 ## Evaluation
 
 ```bash
-python evaluate_v2.py --video_paths <your_video_paths.json> --network Qwen3-VL-Embedding-8B --resume_dir <checkpoint_dir>
+python evaluate_v2.py --network Qwen3-VL-Embedding-8B --resume_dir <checkpoint_dir>
 ```
 
 Evaluates alignment quality (embedding-space nearest-neighbor correspondence) between Main and

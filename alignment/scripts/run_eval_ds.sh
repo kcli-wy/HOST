@@ -46,9 +46,6 @@ RANK=${RANK:-0}
 
 # Define default arguments
 NETWORK="Qwen3-VL-Embedding-8B"
-# Evaluation dataset path — pass your own via --video_paths
-VIDEO_PATHS=""
-
 # Checkpoint directory to evaluate — required, pass via --resume_dir
 RESUME_DIR=""
 
@@ -61,10 +58,6 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --resume_dir)
             RESUME_DIR="$2"
-            shift 2
-            ;;
-        --video_paths)
-            VIDEO_PATHS="$2"
             shift 2
             ;;
         --batch_size)
@@ -89,7 +82,7 @@ done
 # Check if RESUME_DIR is provided
 if [ -z "$RESUME_DIR" ]; then
     echo "Error: --resume_dir must be specified for evaluation."
-    echo "Usage: $0 --resume_dir /path/to/checkpoint [--video_paths /path/to/video_paths.json] [--batch_size 4] [--eval_chunk_probs 0,0,1]"
+    echo "Usage: $0 --resume_dir /path/to/checkpoint [--batch_size 4] [--eval_chunk_probs 0,0,1]"
     exit 1
 fi
 
@@ -98,12 +91,6 @@ if [ ! -d "$RESUME_DIR" ]; then
     exit 1
 fi
 
-# Check if VIDEO_PATHS is provided
-if [ -z "$VIDEO_PATHS" ]; then
-    echo "Error: --video_paths must be specified for evaluation."
-    echo "Usage: $0 --resume_dir /path/to/checkpoint --video_paths /path/to/video_paths.json [--batch_size 4] [--eval_chunk_probs 0,0,1]"
-    exit 1
-fi
 
 # Set LOGDIR using same format as run_ds.sh
 LOGDIR="logs/$WANDB_PROJECT"
@@ -116,14 +103,13 @@ echo "  Loading checkpoint from: $RESUME_DIR"
 echo "  Saving results to: $LOGDIR"
 echo "  WandB Project: $WANDB_PROJECT"
 echo "  Network: $NETWORK"
-echo "  Video Paths: $VIDEO_PATHS"
 echo "  Batch Size: $BATCH_SIZE"
 echo "  Eval Chunk Probs: $EVAL_CHUNK_PROBS (1x, 2x, 4x)"
 echo "  GPUs: $NUM_GPUS"
 echo "==================================="
 
 # Build arguments (using absl flags format for evaluate_v2.py)
-ARGS="--logdir=$LOGDIR --resume_dir=$RESUME_DIR --network=$NETWORK --video_paths=$VIDEO_PATHS --batch_size=$BATCH_SIZE --eval_chunk_probs=$EVAL_CHUNK_PROBS --ds_config=scripts/ds_config_zero3.json"
+ARGS="--logdir=$LOGDIR --resume_dir=$RESUME_DIR --network=$NETWORK --batch_size=$BATCH_SIZE --eval_chunk_probs=$EVAL_CHUNK_PROBS --ds_config=scripts/ds_config_zero3.json"
 
 # Launch with torchrun - use evaluate_v2.py which is based on train.py
 CMD="torchrun --nproc_per_node=$NUM_GPUS --nnodes=$WORLD_SIZE --node_rank=$RANK --master_addr=$MASTER_ADDR --master_port=$MASTER_PORT evaluate_v2.py $ARGS"

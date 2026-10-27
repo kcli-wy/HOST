@@ -47,8 +47,8 @@ protocol used for `policy_training/`/`alignment/`.
 `policy_training/` (self-grounded prediction) and `alignment/` (target coupling) consume the
 **same on-disk data convention**: a JSON list of episode directory paths, each episode directory
 following a shared layout, plus two shared sidecar mapping files (camera views, joint/action
-normalization). This is the single source of truth for that format. Pass the episode-list JSON to
-`alignment/train_scripts/run_ds.sh` through `VIDEO_PATHS`, and set the corresponding fields in
+normalization). This is the single source of truth for that format. Set the episode-list JSON paths in
+`alignment/config.py` under `CONFIG.DATA.VIDEO_PATHS`, and set the corresponding fields in
 `policy_training/configs/data/custom*.yaml`.
 
 Per-module differences are called out inline and summarized in [§2.6](#26-per-module-differences).
@@ -66,7 +66,7 @@ mapping, joint/action mapping, and any per-dataset config dicts (`dataset_fps`,
 
 - `policy_training/`: passed via `data.train.data_path` (comma-separated if multiple files); an
   `exclude_episode_json` field of the same format excludes listed episodes.
-- `alignment/`: passed via `--video_paths` (comma-separated). Entries may also address a segment
+- `alignment/`: listed in `CONFIG.DATA.VIDEO_PATHS`. Entries may also address a segment
   of a longer recording as `path:segment_id:start-end` (inclusive frame range), parsed by
   `AlignmentDataset._parse_video_path` in `alignment/datasets.py`.
 

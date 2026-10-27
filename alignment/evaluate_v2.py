@@ -20,7 +20,6 @@ from utils import log_and_save_high_loss_samples
 flags.DEFINE_string('logdir', None, 'Path to save evaluation results.')
 flags.DEFINE_string('resume_dir', None, 'Path to checkpoint directory to load model from.')
 flags.DEFINE_string('network', 'Qwen3-VL-Embedding-8B', 'Base network to use (must contain "Qwen3-VL").')
-flags.DEFINE_string('video_paths', None, 'Comma-separated list of paths to video_paths.json.')
 flags.DEFINE_integer('local_rank', -1, 'Local rank for distributed training')
 flags.DEFINE_string('ds_config', 'scripts/ds_config_zero3.json', 'Path to DeepSpeed config json.')
 flags.DEFINE_string('eval_chunk_probs', None, 'Chunk probabilities for eval [1x,2x,4x] (e.g., "0,0,1" for 4x multiplier).')
@@ -183,7 +182,7 @@ def evaluate(argv):
                                batch_size=CONFIG.EVAL.BATCH_SIZE,
                                return_iterator=False,  # Don't use infinite iterator
                                distributed=True,  # Enable distributed sampling for multi-GPU
-                               video_paths_json=FLAGS.video_paths,
+                               video_paths_json=CONFIG.DATA.VIDEO_PATHS,
                                processor=processor,
                                contiguous_distributed_eval=contiguous_shard)
 

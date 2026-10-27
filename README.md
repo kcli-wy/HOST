@@ -226,10 +226,10 @@ cd ../alignment
 conda activate HOST_Alignment
 ```
 
-Pass your JSON episode list through `VIDEO_PATHS`, then launch the DeepSpeed ZeRO-3 entrypoint:
+Set your JSON episode lists in `alignment/config.py` under `CONFIG.DATA.VIDEO_PATHS`, then launch training:
 
 ```bash
-VIDEO_PATHS=/path/to/video_paths.json bash train_scripts/run_ds.sh
+bash train_scripts/run_ds.sh
 ```
 
 For evaluation or a custom launcher, inspect all supported arguments with:
